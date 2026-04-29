@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useBranch } from '@/contexts/BranchContext'
 import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
 import { StatusBadge } from '@/components/StatusBadge'
-import type { UniformTransition } from '@/types'
+import type { UniformCategory, UniformTransition } from '@/types'
 
 interface StatusCounts { with_staff: number; in_laundry: number; in_store: number; damaged: number; lost: number; total: number }
 interface CategoryStat { category: UniformCategory; counts: StatusCounts }

@@ -2,20 +2,25 @@ import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import type { StaffMember, RoleCategory, Shift } from '@/types'
+import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
+import type { StaffMember, RoleCategory } from '@/types'
 import { ROLE_CATEGORY_LABELS } from '@/types'
 
-const CATEGORIES: RoleCategory[] = ['chef', 'counter', 'cashier', 'supervisor', 'hk_boys', 'hk_ladies']
-const SHIFTS: { value: Shift; label: string }[] = [
-  { value: '1', label: 'Shift 1' },
-  { value: '2', label: 'Shift 2' },
-  { value: 'both', label: 'Both Shifts' },
-]
+const FALLBACK_CATEGORIES: RoleCategory[] = ['chef', 'counter', 'cashier', 'supervisor', 'hk_boys', 'hk_ladies']
 
-const emptyForm = { name: '', employee_code: '', role_category: 'chef' as RoleCategory, shift: '1' as Shift }
+function nameToSlug(name: string): RoleCategory {
+  const map: Record<string, RoleCategory> = {
+    'Chef': 'chef', 'Counter': 'counter', 'Cashier': 'cashier',
+    'Supervisor': 'supervisor', 'HK Boys': 'hk_boys', 'HK Ladies': 'hk_ladies',
+  }
+  return map[name] ?? 'chef'
+}
+
+const emptyForm = { name: '', role_category: 'chef' as RoleCategory }
 
 export function StaffSettingsPage() {
   const { profile } = useAuth()
+  const { staffCategories } = useCompanyConfig()
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -29,31 +34,29 @@ export function StaffSettingsPage() {
   useEffect(() => { loadStaff() }, [])
 
   async function loadStaff() {
-    const { data } = await supabase.from('staff_members').select('*').order('employee_code', { ascending: true })
+    const { data } = await supabase.from('staff_members').select('*').order('name', { ascending: true })
     setStaff(data ?? [])
     setLoading(false)
   }
 
   function openAdd() { setForm(emptyForm); setEditing(null); setError(''); setShowForm(true) }
   function openEdit(s: StaffMember) {
-    setForm({ name: s.name, employee_code: s.employee_code, role_category: s.role_category, shift: s.shift })
+    setForm({ name: s.name, role_category: s.role_category })
     setEditing(s); setError(''); setShowForm(true)
   }
   function close() { setShowForm(false); setEditing(null) }
 
   async function save() {
-    if (!form.name.trim() || !form.employee_code.trim()) { setError('Name and employee code are required'); return }
+    if (!form.name.trim()) { setError('Name is required'); return }
     setSaving(true); setError('')
     if (editing) {
       const { error: err } = await supabase.from('staff_members').update({
-        name: form.name, employee_code: form.employee_code,
-        role_category: form.role_category, shift: form.shift,
+        name: form.name, role_category: form.role_category,
       }).eq('id', editing.id)
       if (err) { setError(err.message); setSaving(false); return }
     } else {
       const { error: err } = await supabase.from('staff_members').insert({
-        name: form.name, employee_code: form.employee_code,
-        role_category: form.role_category, shift: form.shift,
+        name: form.name, role_category: form.role_category,
         tenant_id: profile!.tenant_id, branch_id: profile!.branch_id!,
       })
       if (err) { setError(err.message); setSaving(false); return }
@@ -66,6 +69,10 @@ export function StaffSettingsPage() {
     await supabase.from('staff_members').update({ is_active: false }).eq('id', s.id)
     loadStaff()
   }
+
+  const categoryOptions = staffCategories.length > 0
+    ? staffCategories.map(c => ({ value: nameToSlug(c.name), label: c.name }))
+    : FALLBACK_CATEGORIES.map(c => ({ value: c, label: ROLE_CATEGORY_LABELS[c] }))
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-slate-200 border-t-slate-700 rounded-full animate-spin" /></div>
 
@@ -80,7 +87,6 @@ export function StaffSettingsPage() {
         )}
       </div>
 
-      {/* Form modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={close}>
           <div className="bg-white rounded-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -97,23 +103,10 @@ export function StaffSettingsPage() {
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Employee Code</label>
-                <input value={form.employee_code} onChange={e => setForm(f => ({ ...f, employee_code: e.target.value }))}
-                  placeholder="e.g. 28"
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
-              </div>
-              <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Category</label>
                 <select value={form.role_category} onChange={e => setForm(f => ({ ...f, role_category: e.target.value as RoleCategory }))}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
-                  {CATEGORIES.map(c => <option key={c} value={c}>{ROLE_CATEGORY_LABELS[c]}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Shift</label>
-                <select value={form.shift} onChange={e => setForm(f => ({ ...f, shift: e.target.value as Shift }))}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
-                  {SHIFTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  {categoryOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>}
@@ -129,7 +122,6 @@ export function StaffSettingsPage() {
         </div>
       )}
 
-      {/* Staff list */}
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         {staff.length === 0 && <p className="text-sm text-slate-400 text-center py-8">No staff yet</p>}
         {staff.filter(s => s.is_active).map((s, i, arr) => (
@@ -139,7 +131,7 @@ export function StaffSettingsPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 truncate">{s.name}</p>
-              <p className="text-xs text-slate-400">#{s.employee_code} · {ROLE_CATEGORY_LABELS[s.role_category]} · Shift {s.shift}</p>
+              <p className="text-xs text-slate-400">{ROLE_CATEGORY_LABELS[s.role_category]}</p>
             </div>
             {canEdit && (
               <div className="flex gap-1">

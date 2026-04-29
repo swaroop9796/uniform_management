@@ -79,8 +79,6 @@ export function StaffDetailPage() {
           <div>
             <h1 className="text-xl font-bold text-slate-900">{staff.name}</h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-sm text-slate-500">#{staff.employee_code}</span>
-              <span className="text-slate-300">·</span>
               <span className="text-sm text-slate-500">{ROLE_CATEGORY_LABELS[staff.role_category]}</span>
             </div>
           </div>

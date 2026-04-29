@@ -16,8 +16,7 @@ export function StaffPicker({ staff, value, onChange, placeholder = 'Search staf
   const containerRef = useRef<HTMLDivElement>(null)
 
   const filtered = staff.filter(s =>
-    s.name.toLowerCase().includes(query.toLowerCase()) ||
-    s.employee_code.includes(query)
+    s.name.toLowerCase().includes(query.toLowerCase())
   )
 
   useEffect(() => {
@@ -49,7 +48,6 @@ export function StaffPicker({ staff, value, onChange, placeholder = 'Search staf
         <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-200 bg-white">
           <div>
             <span className="text-sm font-medium text-slate-800">{selected.name}</span>
-            <span className="text-xs text-slate-400 ml-2">#{selected.employee_code}</span>
           </div>
           <button onClick={clear} className="text-slate-400 hover:text-slate-600">
             <X size={15} />
@@ -80,7 +78,6 @@ export function StaffPicker({ staff, value, onChange, placeholder = 'Search staf
                 className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
               >
                 <span className="text-sm text-slate-800">{s.name}</span>
-                <span className="text-xs text-slate-400">#{s.employee_code}</span>
               </button>
             ))
           )}

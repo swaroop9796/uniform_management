@@ -36,7 +36,8 @@ export function CompanySettingsPage() {
     const { error: uploadErr } = await supabase.storage.from('logos').upload(path, file, { upsert: true, contentType: file.type })
     if (uploadErr) { setUploadError(friendlyError(uploadErr)); setUploading(false); return }
     const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
-    const { error: updateErr } = await supabase.from('tenants').update({ logo_url: publicUrl }).eq('id', profile.tenant_id)
+    const publicUrlWithBust = `${publicUrl}?t=${Date.now()}`
+    const { error: updateErr } = await supabase.from('tenants').update({ logo_url: publicUrlWithBust }).eq('id', profile.tenant_id)
     if (updateErr) { setUploadError(friendlyError(updateErr)); setUploading(false); return }
     await reloadLogo()
     setUploading(false)

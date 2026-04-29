@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowLeft, Camera } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -8,13 +8,16 @@ import { friendlyError } from '@/lib/utils'
 
 export function CompanySettingsPage() {
   const { profile } = useAuth()
-  const { reloadCompanyName } = useCompanyConfig()
+  const { reloadCompanyName, reloadLogo, logoUrl } = useCompanyConfig()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -23,6 +26,22 @@ export function CompanySettingsPage() {
       setLoading(false)
     })
   }, [profile?.tenant_id])
+
+  async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !profile) return
+    setUploading(true)
+    setUploadError('')
+    const path = `${profile.tenant_id}/logo`
+    const { error: uploadErr } = await supabase.storage.from('logos').upload(path, file, { upsert: true, contentType: file.type })
+    if (uploadErr) { setUploadError(friendlyError(uploadErr)); setUploading(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
+    const { error: updateErr } = await supabase.from('tenants').update({ logo_url: publicUrl }).eq('id', profile.tenant_id)
+    if (updateErr) { setUploadError(friendlyError(updateErr)); setUploading(false); return }
+    await reloadLogo()
+    setUploading(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   async function save() {
     if (!name.trim()) { setError('Company name is required'); return }
@@ -63,7 +82,30 @@ export function CompanySettingsPage() {
         </button>
       </div>
 
-      <p className="text-xs text-slate-400 text-center px-4">Logo upload coming in a future update.</p>
+      <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3">
+        <p className="text-xs font-medium text-slate-600">Company Logo</p>
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl border border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0 bg-slate-50">
+            {logoUrl
+              ? <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              : <span className="text-2xl font-bold text-slate-300">{name.charAt(0) || '?'}</span>
+            }
+          </div>
+          <div className="flex-1">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Camera size={15} />
+              {uploading ? 'Uploading…' : logoUrl ? 'Change Logo' : 'Upload Logo'}
+            </button>
+            <p className="text-xs text-slate-400 mt-1.5">PNG, JPG or SVG · Max 2 MB</p>
+          </div>
+        </div>
+        {uploadError && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{uploadError}</p>}
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+      </div>
     </div>
   )
 }

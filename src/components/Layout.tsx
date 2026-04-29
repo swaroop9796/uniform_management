@@ -18,7 +18,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
 
   const isOwner = profile?.role === 'owner'
-  const { companyName } = useCompanyConfig()
+  const { companyName, logoUrl } = useCompanyConfig()
   const locationLabel = selectedBranch?.name ?? (isOwner ? 'All Branches' : branches[0]?.name ?? '…')
   const roleLabel = profile?.role === 'owner' ? 'Owner' : 'Store Manager'
   const canSwitchBranch = isOwner && branches.length > 0
@@ -36,11 +36,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Brand */}
         <div className="px-5 py-5 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-sm font-bold">
-                {companyName.charAt(0) || 'B'}
-              </span>
-            </div>
+            {logoUrl
+              ? <img src={logoUrl} alt={companyName} className="w-8 h-8 rounded-lg object-contain bg-white border border-slate-100 flex-shrink-0" />
+              : <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-sm font-bold">{companyName.charAt(0) || 'B'}</span>
+                </div>
+            }
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-slate-900 truncate">{companyName}</p>
               {canSwitchBranch ? (

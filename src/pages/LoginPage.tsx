@@ -117,7 +117,7 @@ export function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading || otp.length < 6 || otp.length > 8}
+                disabled={loading || otp.length < 1}
                 className="w-full bg-slate-900 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60 transition-colors"
               >
                 {loading ? 'Verifying…' : 'Verify & sign in'}

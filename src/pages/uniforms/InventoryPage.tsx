@@ -2,30 +2,29 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Filter } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
 import { StatusBadge } from '@/components/StatusBadge'
-import type { UniformItem, UniformCategory, UniformStatus } from '@/types'
+import type { UniformItem, UniformStatus } from '@/types'
 import { ITEM_TYPE_LABELS } from '@/types'
 
 export function InventoryPage() {
   const navigate = useNavigate()
+  const { uniformCategories } = useCompanyConfig()
   const [items, setItems] = useState<UniformItem[]>([])
-  const [categories, setCategories] = useState<UniformCategory[]>([])
   const [filterStatus, setFilterStatus] = useState<UniformStatus | 'all'>('all')
   const [filterCat, setFilterCat] = useState<string>('all')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    if (uniformCategories.length > 0) loadData()
+  }, [uniformCategories])
 
   async function loadData() {
-    const [itemsRes, catsRes] = await Promise.all([
-      supabase.from('uniform_items')
-        .select('*, category:category_id(*), current_staff:current_staff_id(name, employee_code)')
-        .order('position_code')
-        .order('set_number'),
-      supabase.from('uniform_categories').select('*').order('name'),
-    ])
-    setItems(itemsRes.data as UniformItem[] ?? [])
-    setCategories(catsRes.data ?? [])
+    const { data } = await supabase.from('uniform_items')
+      .select('*, category:category_id(*), current_staff:current_staff_id(name)')
+      .order('position_code')
+      .order('set_number')
+    setItems(data as UniformItem[] ?? [])
     setLoading(false)
   }
 
@@ -67,7 +66,7 @@ export function InventoryPage() {
           >
             All categories
           </button>
-          {categories.map(cat => (
+          {uniformCategories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setFilterCat(cat.id)}

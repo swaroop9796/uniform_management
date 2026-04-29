@@ -4,6 +4,7 @@ import QRCode from 'qrcode'
 import { Plus, Download, Printer, ChevronDown, ChevronUp, X, QrCode } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
 import { StatusBadge } from '@/components/StatusBadge'
 import type { UniformItem, UniformCategory, ItemType } from '@/types'
 import { ITEM_TYPE_LABELS } from '@/types'
@@ -21,37 +22,34 @@ const emptyForm = {
 
 export function UniformManagePage() {
   const { profile } = useAuth()
+  const { uniformCategories } = useCompanyConfig()
   const navigate = useNavigate()
   const [groups, setGroups] = useState<GroupedItems[]>([])
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
-  const [categories, setCategories] = useState<UniformCategory[]>([])
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [qrPreview, setQrPreview] = useState<{ item: UniformItem; dataUrl: string } | null>(null)
 
   const canEdit = profile?.role && ['owner', 'hr_admin', 'branch_manager'].includes(profile.role)
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    if (uniformCategories.length > 0) loadData()
+  }, [uniformCategories])
 
   async function loadData() {
-    const [itemsRes, catsRes] = await Promise.all([
-      supabase.from('uniform_items')
-        .select('*, category:category_id(*)')
-        .order('position_code').order('set_number').order('item_type'),
-      supabase.from('uniform_categories').select('*').order('name'),
-    ])
-    const cats = catsRes.data ?? []
-    const items = (itemsRes.data ?? []) as UniformItem[]
-    const grouped: GroupedItems[] = cats.map(cat => ({
+    const { data } = await supabase.from('uniform_items')
+      .select('*, category:category_id(*)')
+      .order('position_code').order('set_number').order('item_type')
+    const items = (data ?? []) as UniformItem[]
+    const grouped: GroupedItems[] = uniformCategories.map(cat => ({
       category: cat,
       items: items.filter(i => i.category_id === cat.id),
     })).filter(g => g.items.length > 0)
     setGroups(grouped)
-    setCategories(cats)
-    if (cats.length > 0) setForm(f => ({ ...f, category_id: cats[0].id }))
+    if (uniformCategories.length > 0) setForm(f => ({ ...f, category_id: uniformCategories[0].id }))
     setLoading(false)
   }
 
@@ -302,7 +300,7 @@ export function UniformManagePage() {
                 <label className="block text-xs font-medium text-slate-600 mb-1">Category</label>
                 <select value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {uniformCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>

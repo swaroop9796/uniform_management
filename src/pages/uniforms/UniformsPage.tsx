@@ -20,10 +20,9 @@ const emptyForm = { position_code: '', set_number: '1', item_type: 'shirt' as It
 export function UniformsPage() {
   const { profile } = useAuth()
   const { selectedBranchId } = useBranch()
-  const { numSets } = useCompanyConfig()
+  const { numSets, uniformCategories } = useCompanyConfig()
   const navigate = useNavigate()
   const [groups, setGroups] = useState<GroupedItems[]>([])
-  const [categories, setCategories] = useState<UniformCategory[]>([])
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [statusFilter, setStatusFilter] = useState<UniformStatus | 'all' | 'unassigned'>('all')
   const [loading, setLoading] = useState(true)
@@ -35,7 +34,9 @@ export function UniformsPage() {
 
   const canEdit = profile?.role && ['owner', 'store_manager'].includes(profile.role)
 
-  useEffect(() => { if (selectedBranchId && selectedBranchId !== 'all') loadData() }, [selectedBranchId])
+  useEffect(() => {
+    if (selectedBranchId && selectedBranchId !== 'all' && uniformCategories.length > 0) loadData()
+  }, [selectedBranchId, uniformCategories])
 
   useEffect(() => {
     setGroups(prev => prev.map(g => ({
@@ -47,14 +48,11 @@ export function UniformsPage() {
   }, [statusFilter])
 
   async function loadData() {
-    const [itemsRes, catsRes] = await Promise.all([
-      supabase.from('uniform_items')
-        .select('*, category:category_id(*), current_staff:current_staff_id(name, employee_code)')
-        .eq('branch_id', selectedBranchId)
-        .order('position_code').order('set_number').order('item_type'),
-      supabase.from('uniform_categories').select('*').order('name'),
-    ])
-    const cats = catsRes.data ?? []
+    const itemsRes = await supabase.from('uniform_items')
+      .select('*, category:category_id(*), current_staff:current_staff_id(name)')
+      .eq('branch_id', selectedBranchId)
+      .order('position_code').order('set_number').order('item_type')
+    const cats = uniformCategories
     const items = (itemsRes.data ?? []) as UniformItem[]
     const grouped: GroupedItems[] = cats
       .map(cat => {
@@ -63,8 +61,7 @@ export function UniformsPage() {
       })
       .filter(g => g.items.length > 0)
     setGroups(grouped)
-    setCategories(cats)
-    if (cats.length > 0) setForm(f => ({ ...f, category_id: cats[0].id }))
+    if (uniformCategories.length > 0) setForm(f => ({ ...f, category_id: uniformCategories[0].id }))
     setLoading(false)
   }
 
@@ -322,7 +319,7 @@ export function UniformsPage() {
                 <label className="block text-xs font-medium text-slate-600 mb-1">Category</label>
                 <select value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {uniformCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>

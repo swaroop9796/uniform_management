@@ -4,8 +4,9 @@ import { Clock, TrendingUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useBranch } from '@/contexts/BranchContext'
+import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
 import { StatusBadge } from '@/components/StatusBadge'
-import type { UniformCategory, UniformTransition } from '@/types'
+import type { UniformTransition } from '@/types'
 
 interface StatusCounts { with_staff: number; in_laundry: number; in_store: number; damaged: number; lost: number; total: number }
 interface CategoryStat { category: UniformCategory; counts: StatusCounts }
@@ -13,22 +14,23 @@ interface CategoryStat { category: UniformCategory; counts: StatusCounts }
 export function DashboardPage() {
   const { profile } = useAuth()
   const { selectedBranchId } = useBranch()
+  const { uniformCategories } = useCompanyConfig()
   const navigate = useNavigate()
   const [overall, setOverall] = useState<StatusCounts | null>(null)
   const [byCategory, setByCategory] = useState<CategoryStat[]>([])
   const [recentActivity, setRecentActivity] = useState<UniformTransition[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { if (profile && selectedBranchId && selectedBranchId !== 'all') loadData() }, [profile, selectedBranchId])
+  useEffect(() => {
+    if (profile && selectedBranchId && selectedBranchId !== 'all' && uniformCategories.length > 0) loadData()
+  }, [profile, selectedBranchId, uniformCategories])
 
   async function loadData() {
-    const [itemsRes, catsRes] = await Promise.all([
-      supabase.from('uniform_items').select('id, current_status, category_id').eq('branch_id', selectedBranchId),
-      supabase.from('uniform_categories').select('*'),
-    ])
+    const itemsRes = await supabase.from('uniform_items')
+      .select('id, current_status, category_id').eq('branch_id', selectedBranchId)
 
     const items = itemsRes.data ?? []
-    const cats = catsRes.data ?? []
+    const cats = uniformCategories
     const itemIds = items.map(i => i.id)
 
     const activityRes = itemIds.length > 0

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { AssetState, StaffCategory, ItemSubtype } from '@/types'
+import type { AssetState, StaffCategory, ItemSubtype, UniformCategory } from '@/types'
 
 interface CompanyConfig {
   companyName: string
@@ -9,6 +9,7 @@ interface CompanyConfig {
   assetStates: AssetState[]
   staffCategories: StaffCategory[]
   itemSubtypes: ItemSubtype[]
+  uniformCategories: UniformCategory[]
   loaded: boolean
   reloadCompanyName: () => Promise<void>
   reloadLogo: () => Promise<void>
@@ -20,7 +21,7 @@ interface CompanyConfig {
 }
 
 const CompanyConfigContext = createContext<CompanyConfig>({
-  companyName: '', logoUrl: '', numSets: 2, assetStates: [], staffCategories: [], itemSubtypes: [], loaded: false,
+  companyName: '', logoUrl: '', numSets: 2, assetStates: [], staffCategories: [], itemSubtypes: [], uniformCategories: [], loaded: false,
   reloadCompanyName: async () => {}, reloadLogo: async () => {},
   getState: () => undefined, getAssignedState: () => undefined,
   getInitialState: () => undefined, getStaffCategory: () => undefined,
@@ -34,26 +35,27 @@ export function CompanyConfigProvider({ children }: { children: ReactNode }) {
   const [assetStates, setAssetStates] = useState<AssetState[]>([])
   const [staffCategories, setStaffCategories] = useState<StaffCategory[]>([])
   const [itemSubtypes, setItemSubtypes] = useState<ItemSubtype[]>([])
+  const [uniformCategories, setUniformCategories] = useState<UniformCategory[]>([])
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) loadConfig()
-      else { setCompanyName(''); setLogoUrl(''); setAssetStates([]); setStaffCategories([]); setItemSubtypes([]); setLoaded(false) }
-    })
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) loadConfig()
-      else setLoaded(false)
+      else {
+        setCompanyName(''); setLogoUrl(''); setAssetStates([])
+        setStaffCategories([]); setItemSubtypes([]); setUniformCategories([]); setLoaded(false)
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
 
   async function loadConfig() {
-    const [tenantRes, statesRes, catsRes, subtypesRes] = await Promise.all([
+    const [tenantRes, statesRes, catsRes, subtypesRes, uniformCatsRes] = await Promise.all([
       supabase.from('tenants').select('name, num_sets, logo_url').single(),
       supabase.from('asset_states').select('*').order('sort_order'),
       supabase.from('staff_categories').select('*').order('sort_order'),
       supabase.from('item_subtypes').select('*').order('sort_order'),
+      supabase.from('uniform_categories').select('*').order('name'),
     ])
     setCompanyName(tenantRes.data?.name ?? '')
     setLogoUrl(tenantRes.data?.logo_url ?? '')
@@ -61,6 +63,7 @@ export function CompanyConfigProvider({ children }: { children: ReactNode }) {
     setAssetStates(statesRes.data ?? [])
     setStaffCategories(catsRes.data ?? [])
     setItemSubtypes(subtypesRes.data ?? [])
+    setUniformCategories(uniformCatsRes.data ?? [])
     setLoaded(true)
   }
 
@@ -81,6 +84,7 @@ export function CompanyConfigProvider({ children }: { children: ReactNode }) {
     assetStates,
     staffCategories,
     itemSubtypes,
+    uniformCategories,
     loaded,
     reloadCompanyName,
     reloadLogo,

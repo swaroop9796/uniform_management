@@ -95,16 +95,16 @@ export function LoginPage() {
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">6-digit code</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Login code</label>
                 <p className="text-xs text-slate-400 mb-3">Sent to {email}</p>
                 <input
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  maxLength={6}
+                  maxLength={8}
                   value={otp}
                   onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
+                  placeholder="––––––––"
                   required
                   autoFocus
                   className="w-full px-3.5 py-3 rounded-xl border border-slate-200 text-2xl font-mono tracking-widest text-center text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition"
@@ -117,7 +117,7 @@ export function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading || otp.length < 6}
+                disabled={loading || otp.length < 6 || otp.length > 8}
                 className="w-full bg-slate-900 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60 transition-colors"
               >
                 {loading ? 'Verifying…' : 'Verify & sign in'}

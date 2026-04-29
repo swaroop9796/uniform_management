@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { Plus, Download, Printer, ChevronDown, ChevronUp, X, QrCode } from 'lucide-react'

@@ -12,14 +12,7 @@ interface StaffWithCount extends StaffMember { uniform_count: number }
 interface Group { category: RoleCategory; staff: StaffWithCount[] }
 
 const CATEGORY_ORDER: RoleCategory[] = ['chef', 'counter', 'cashier', 'supervisor', 'hk_boys', 'hk_ladies']
-const CATEGORY_COLORS: Record<RoleCategory, string> = {
-  chef:       'bg-amber-100 text-amber-800',
-  counter:    'bg-blue-100 text-blue-800',
-  cashier:    'bg-purple-100 text-purple-800',
-  supervisor: 'bg-cyan-100 text-cyan-800',
-  hk_boys:    'bg-emerald-100 text-emerald-800',
-  hk_ladies:  'bg-pink-100 text-pink-800',
-}
+
 const CATEGORY_DOT: Record<RoleCategory, string> = {
   chef:       '#f59e0b',
   counter:    '#3b82f6',

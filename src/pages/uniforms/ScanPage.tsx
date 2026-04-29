@@ -139,7 +139,7 @@ export function ScanPage() {
       .ilike('qr_code', `%${value.trim()}%`)
       .limit(8)
     setSearching(false)
-    setSearchResults((data ?? []) as typeof searchResults)
+    setSearchResults((data ?? []) as unknown as typeof searchResults)
   }
 
   function reset() {

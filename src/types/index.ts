@@ -87,10 +87,8 @@ export interface StaffMember {
   id: string
   tenant_id: string
   branch_id: string
-  employee_code: string
   name: string
   role_category: RoleCategory    // legacy text column
-  shift: Shift
   is_active: boolean
   staff_category_id: string | null  // new FK → staff_categories
   created_at: string

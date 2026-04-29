@@ -10,6 +10,7 @@ DECLARE
   v_branch_id UUID := 'b2000000-0000-0000-0000-000000000001';
   v_owner_id  UUID := 'b3000000-0000-0000-0000-000000000001';
   v_mgr_id    UUID := 'b3000000-0000-0000-0000-000000000002';
+  v_swaroop_id UUID := 'b3000000-0000-0000-0000-000000000003';
 
   -- Uniform category IDs
   v_cat_chef      UUID := 'c0000000-0000-0000-0000-000000000001';
@@ -98,12 +99,20 @@ BEGIN
     now(), now(), now(),
     '{"provider":"email","providers":["email"]}', '{"full_name":"Harish Gowda"}',
     'authenticated', 'authenticated', '', '', '', ''
+  ),
+  (
+    v_swaroop_id, '00000000-0000-0000-0000-000000000000',
+    'swaroop.9796@gmail.com', '',
+    now(), now(), now(),
+    '{"provider":"email","providers":["email"]}', '{"full_name":"Swaroop"}',
+    'authenticated', 'authenticated', '', '', '', ''
   );
 
   -- ── PROFILES ──────────────────────────────────────────────
   INSERT INTO profiles (id, tenant_id, full_name, role) VALUES
-  (v_owner_id, v_tenant_id, 'Vikas',        'owner'),
-  (v_mgr_id,   v_tenant_id, 'Harish Gowda', 'store_manager');
+  (v_owner_id,   v_tenant_id, 'Vikas',        'owner'),
+  (v_mgr_id,     v_tenant_id, 'Harish Gowda', 'store_manager'),
+  (v_swaroop_id, v_tenant_id, 'Swaroop',       'owner');
 
   -- ── USER → BRANCH ASSIGNMENTS ─────────────────────────────
   INSERT INTO user_branches (user_id, branch_id) VALUES (v_mgr_id, v_branch_id);

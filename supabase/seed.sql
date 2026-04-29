@@ -161,10 +161,10 @@ BEGIN
       ELSE                   v_scat_id := v_scat_chef;
     END CASE;
 
-    INSERT INTO staff_members (id, tenant_id, branch_id, employee_code, name, role_category, shift, staff_category_id)
+    INSERT INTO staff_members (id, tenant_id, branch_id, name, role_category, staff_category_id)
     VALUES (
       gen_random_uuid(), v_tenant_id, v_branch_id,
-      v_staff->>'code', v_staff->>'name', v_staff->>'cat', '1',
+      v_staff->>'name', v_staff->>'cat',
       v_scat_id
     )
     RETURNING id INTO v_staff_id;

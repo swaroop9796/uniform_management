@@ -120,6 +120,7 @@ export interface UniformItem {
   current_status: UniformStatus  // legacy text column
   asset_state_id: string | null  // new FK → asset_states
   current_staff_id: string | null
+  size: string | null
   notes: string | null
   created_at: string
   updated_at: string

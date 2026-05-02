@@ -15,7 +15,8 @@ const ITEM_TYPES: ItemType[] = ['shirt', 'pant', 'apron']
 const STATUS_FILTERS: (UniformStatus | 'all' | 'unassigned')[] = ['all', 'with_staff', 'unassigned', 'in_laundry', 'in_store', 'damaged', 'lost']
 
 interface GroupedItems { category: UniformCategory; items: UniformItem[]; filtered: UniformItem[] }
-const emptyForm = { position_code: '', set_number: '1', item_type: 'shirt' as ItemType, category_id: '' }
+const SIZES = ['S', 'M', 'L', 'XL', 'XXL']
+const emptyForm = { position_code: '', set_number: '1', item_type: 'shirt' as ItemType, category_id: '', size: '' }
 
 export function UniformsPage() {
   const { profile } = useAuth()
@@ -161,11 +162,12 @@ export function UniformsPage() {
       set_number: parseInt(form.set_number),
       qr_code: crypto.randomUUID(),
       current_status: 'in_store',
+      size: form.size || null,
     })
     setSaving(false)
     if (error) { setFormError(friendlyError(error)); return }
     setShowForm(false)
-    setForm(f => ({ ...f, position_code: '' }))
+    setForm(f => ({ ...f, position_code: '', size: '' }))
     loadData()
   }
 
@@ -247,6 +249,9 @@ export function UniformsPage() {
                         <span className="text-slate-400 mx-1">·</span>
                         <span className="text-slate-600 font-normal capitalize">{ITEM_TYPE_LABELS[item.item_type]}</span>
                         <span className="text-slate-400 ml-1.5 text-xs">S{item.set_number}</span>
+                        {item.size && (
+                          <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">{item.size}</span>
+                        )}
                       </p>
                       {item.current_staff && (
                         <p className="text-xs text-slate-400 mt-0.5">
@@ -350,6 +355,14 @@ export function UniformsPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Size <span className="text-slate-400 font-normal">(optional)</span></label>
+                <select value={form.size} onChange={e => setForm(f => ({ ...f, size: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
+                  <option value="">No size</option>
+                  {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div className="bg-slate-50 rounded-xl px-3 py-2.5">
                 <p className="text-xs text-slate-500">A unique QR code is auto-generated when saved. Download and print the label to attach to the garment.</p>

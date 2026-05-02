@@ -10,6 +10,7 @@ import type { UniformItem, UniformCategory, ItemType } from '@/types'
 import { ITEM_TYPE_LABELS } from '@/types'
 
 const ITEM_TYPES: ItemType[] = ['shirt', 'pant', 'apron']
+const SIZES = ['S', 'M', 'L', 'XL', 'XXL']
 
 interface GroupedItems { category: UniformCategory; items: UniformItem[] }
 
@@ -18,6 +19,7 @@ const emptyForm = {
   set_number: '1' as '1' | '2',
   item_type: 'shirt' as ItemType,
   category_id: '',
+  size: '',
 }
 
 export function UniformManagePage() {
@@ -165,11 +167,12 @@ export function UniformManagePage() {
       set_number: parseInt(form.set_number),
       qr_code: crypto.randomUUID(),
       current_status: 'in_store',
+      size: form.size || null,
     })
     setSaving(false)
     if (error) { setFormError(error.message); return }
     setShowForm(false)
-    setForm(f => ({ ...f, position_code: '' }))
+    setForm(f => ({ ...f, position_code: '', size: '' }))
     loadData()
   }
 
@@ -224,6 +227,9 @@ export function UniformManagePage() {
                     <span className="text-slate-400 font-normal ml-1.5">·</span>
                     <span className="text-slate-600 font-normal ml-1.5 capitalize">{ITEM_TYPE_LABELS[item.item_type]}</span>
                     <span className="text-slate-400 font-normal ml-1.5">Set {item.set_number}</span>
+                    {item.size && (
+                      <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">{item.size}</span>
+                    )}
                   </p>
                   <p className="text-xs font-mono text-slate-300 mt-0.5 truncate">{item.qr_code.substring(0, 24)}…</p>
                 </div>
@@ -331,6 +337,14 @@ export function UniformManagePage() {
                     </button>
                   ))}
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Size <span className="text-slate-400 font-normal">(optional)</span></label>
+                <select value={form.size} onChange={e => setForm(f => ({ ...f, size: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
+                  <option value="">No size</option>
+                  {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div className="bg-slate-50 rounded-xl px-3 py-2.5">
                 <p className="text-xs text-slate-500">A unique QR code will be automatically generated for this item when saved.</p>

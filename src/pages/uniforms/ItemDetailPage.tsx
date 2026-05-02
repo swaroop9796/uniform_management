@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowRight } from 'lucide-react'
+import { ChevronLeft, ArrowRight, Pencil, Check, X as XIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useBranch } from '@/contexts/BranchContext'
@@ -12,6 +12,7 @@ import { ITEM_TYPE_LABELS, STATUS_LABELS } from '@/types'
 import { StaffPicker } from '@/components/StaffPicker'
 
 const TRANSITION_STATES: UniformStatus[] = ['with_staff', 'in_laundry', 'in_store', 'damaged', 'lost']
+const SIZES = ['S', 'M', 'L', 'XL', 'XXL']
 
 export function ItemDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -30,6 +31,9 @@ export function ItemDetailPage() {
   const [notes, setNotes] = useState('')
   const [transitionError, setTransitionError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [editingSize, setEditingSize] = useState(false)
+  const [sizeValue, setSizeValue] = useState('')
+  const [savingSize, setSavingSize] = useState(false)
 
   useEffect(() => { if (id) loadData(id) }, [id])
 
@@ -50,6 +54,7 @@ export function ItemDetailPage() {
     if (itemRes.data) {
       setNewStatus(itemRes.data.current_status)
       setSelectedStaff(itemRes.data.current_staff_id ?? '')
+      setSizeValue(itemRes.data.size ?? '')
     }
     setLoading(false)
   }
@@ -86,6 +91,17 @@ export function ItemDetailPage() {
     }
   }
 
+  async function saveSize() {
+    if (!item) return
+    setSavingSize(true)
+    await supabase.from('uniform_items').update({ size: sizeValue || null }).eq('id', item.id)
+    setSavingSize(false)
+    setEditingSize(false)
+    setItem(prev => prev ? { ...prev, size: sizeValue || null } : prev)
+  }
+
+  const canEdit = profile?.role && ['owner', 'store_manager'].includes(profile.role)
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-slate-200 border-t-slate-700 rounded-full animate-spin" /></div>
   if (!item) return <div className="p-4 text-slate-500">Item not found</div>
 
@@ -103,6 +119,37 @@ export function ItemDetailPage() {
             <p className="text-slate-500 text-sm mt-0.5 capitalize">
               {ITEM_TYPE_LABELS[item.item_type]} · Set {item.set_number} · {item.category?.name}
             </p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              {editingSize ? (
+                <>
+                  <select value={sizeValue} onChange={e => setSizeValue(e.target.value)}
+                    className="px-2 py-1 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
+                    <option value="">No size</option>
+                    {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <button onClick={saveSize} disabled={savingSize}
+                    className="p-1 rounded-lg bg-emerald-600 text-white disabled:opacity-50">
+                    <Check size={13} />
+                  </button>
+                  <button onClick={() => { setEditingSize(false); setSizeValue(item.size ?? '') }}
+                    className="p-1 rounded-lg border border-slate-200 text-slate-500">
+                    <XIcon size={13} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-slate-500">
+                    Size: <strong>{item.size ?? '—'}</strong>
+                  </span>
+                  {canEdit && (
+                    <button onClick={() => setEditingSize(true)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                      <Pencil size={12} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
           <StatusBadge status={item.current_status} />
         </div>
@@ -126,7 +173,7 @@ export function ItemDetailPage() {
         </div>
 
         <div className="mt-4 flex gap-2">
-          {item.current_status !== 'with_staff' && (
+          {!item.current_staff_id && (
             <button
               onClick={() => { setNewStatus('with_staff'); setShowTransition(true) }}
               className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold active:bg-emerald-700"

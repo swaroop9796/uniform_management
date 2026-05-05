@@ -43,7 +43,7 @@ export function UniformManagePage() {
 
   async function loadData() {
     const { data } = await supabase.from('uniform_items')
-      .select('*, category:category_id(*)')
+      .select('*, category:category_id(*), current_staff:current_staff_id(name)')
       .order('position_code').order('set_number').order('item_type')
     const items = (data ?? []) as UniformItem[]
     const grouped: GroupedItems[] = uniformCategories.map(cat => ({
@@ -178,7 +178,9 @@ export function UniformManagePage() {
 
   async function deleteItem(item: UniformItem, e: React.MouseEvent) {
     e.stopPropagation()
-    if (!confirm(`Delete ${item.position_code} ${item.item_type} Set ${item.set_number}? History will be lost.`)) return
+    const staffName = (item.current_staff as { name?: string })?.name
+    const assignedMsg = staffName ? ` Currently assigned to ${staffName}.` : ''
+    if (!confirm(`Delete ${item.position_code} ${item.item_type} Set ${item.set_number}?${assignedMsg} All history will be lost.`)) return
     await supabase.from('uniform_items').delete().eq('id', item.id)
     loadData()
   }

@@ -118,8 +118,16 @@ export function StaffListPage() {
 
   async function deactivate(s: StaffMember, e: React.MouseEvent) {
     e.stopPropagation()
-    if (!confirm(`Remove ${s.name}? Their uniform history will be kept.`)) return
+    const { count } = await supabase.from('uniform_items')
+      .select('id', { count: 'exact', head: true }).eq('current_staff_id', s.id)
+    const assignedMsg = (count ?? 0) > 0
+      ? `They currently have ${count} uniform(s) assigned — these will be unassigned. Transition history is kept.`
+      : `Their uniform history will be kept.`
+    if (!confirm(`Remove ${s.name}? ${assignedMsg}`)) return
     await supabase.from('staff_members').update({ is_active: false }).eq('id', s.id)
+    if ((count ?? 0) > 0) {
+      await supabase.from('uniform_items').update({ current_staff_id: null }).eq('current_staff_id', s.id)
+    }
     loadStaff()
   }
 

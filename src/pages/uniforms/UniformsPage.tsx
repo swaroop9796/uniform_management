@@ -173,7 +173,9 @@ export function UniformsPage() {
 
   async function deleteItem(item: UniformItem, e: React.MouseEvent) {
     e.stopPropagation()
-    if (!confirm(`Delete ${item.position_code} ${item.item_type} Set ${item.set_number}?`)) return
+    const staffName = (item.current_staff as { name?: string })?.name
+    const assignedMsg = staffName ? ` Currently assigned to ${staffName}.` : ''
+    if (!confirm(`Delete ${item.position_code} ${item.item_type} Set ${item.set_number}?${assignedMsg} All history will be lost.`)) return
     await supabase.from('uniform_items').delete().eq('id', item.id)
     loadData()
   }

@@ -116,7 +116,7 @@ export interface UniformItem {
   item_subtype_id: string | null  // new FK → item_subtypes
   position_code: string
   set_number: 1 | 2
-  qr_code: string
+  barcode: string
   current_status: UniformStatus  // legacy text column
   asset_state_id: string | null  // new FK → asset_states
   current_staff_id: string | null

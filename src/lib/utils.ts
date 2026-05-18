@@ -5,12 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function generateBarcode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
 export function friendlyError(error: { message?: string } | null | undefined): string {
   const msg = error?.message ?? ''
   if (msg.includes('duplicate key') && msg.includes('employee_code'))
     return 'Employee code already exists. Please use a different code.'
-  if (msg.includes('duplicate key') && msg.includes('qr_code'))
-    return 'A uniform with this QR code already exists.'
+  if (msg.includes('duplicate key') && msg.includes('barcode'))
+    return 'A uniform with this barcode already exists.'
   if (msg.includes('duplicate key'))
     return 'This record already exists. Please check for duplicates.'
   if (msg.includes('violates not-null constraint'))

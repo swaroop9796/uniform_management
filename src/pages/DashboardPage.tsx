@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock, TrendingUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { itemService } from '@/services/itemService'
 import { useAuth } from '@/hooks/useAuth'
 import { useBranch } from '@/contexts/BranchContext'
 import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
@@ -26,10 +27,9 @@ export function DashboardPage() {
   }, [profile, selectedBranchId, uniformCategories])
 
   async function loadData() {
-    const itemsRes = await supabase.from('uniform_items')
-      .select('id, current_status, category_id').eq('branch_id', selectedBranchId)
+    const itemsRes = await itemService.countForBranch(selectedBranchId)
 
-    const items = itemsRes.data ?? []
+    const items = (itemsRes.data ?? []) as { id: string; current_status: string; category_id: string }[]
     const cats = uniformCategories
     const itemIds = items.map(i => i.id)
 

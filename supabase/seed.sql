@@ -204,35 +204,35 @@ BEGIN
 
     -- Set 1 items
     IF v_has_shirt THEN
-      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, qr_code, current_status, asset_state_id, current_staff_id)
-      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'shirt', v_sub_shirt, v_pos_code, 1, gen_random_uuid()::text,
+      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, barcode, current_status, asset_state_id, current_staff_id)
+      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'shirt', v_sub_shirt, v_pos_code, 1, LPAD(NEXTVAL('uniform_barcode_seq')::TEXT, 6, '0'),
         v_status1, v_state_id1, CASE WHEN v_status1 = 'with_staff' THEN v_staff_id ELSE NULL END);
     END IF;
     IF v_has_pant THEN
-      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, qr_code, current_status, asset_state_id, current_staff_id)
-      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'pant', v_sub_pant, v_pos_code, 1, gen_random_uuid()::text,
+      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, barcode, current_status, asset_state_id, current_staff_id)
+      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'pant', v_sub_pant, v_pos_code, 1, LPAD(NEXTVAL('uniform_barcode_seq')::TEXT, 6, '0'),
         v_status1, v_state_id1, CASE WHEN v_status1 = 'with_staff' THEN v_staff_id ELSE NULL END);
     END IF;
     IF v_has_apron THEN
-      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, qr_code, current_status, asset_state_id, current_staff_id)
-      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'apron', v_sub_apron, v_pos_code, 1, gen_random_uuid()::text,
+      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, barcode, current_status, asset_state_id, current_staff_id)
+      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'apron', v_sub_apron, v_pos_code, 1, LPAD(NEXTVAL('uniform_barcode_seq')::TEXT, 6, '0'),
         v_status1, v_state_id1, CASE WHEN v_status1 = 'with_staff' THEN v_staff_id ELSE NULL END);
     END IF;
 
     -- Set 2 items
     IF v_has_shirt THEN
-      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, qr_code, current_status, asset_state_id, current_staff_id)
-      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'shirt', v_sub_shirt, v_pos_code, 2, gen_random_uuid()::text,
+      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, barcode, current_status, asset_state_id, current_staff_id)
+      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'shirt', v_sub_shirt, v_pos_code, 2, LPAD(NEXTVAL('uniform_barcode_seq')::TEXT, 6, '0'),
         v_status2, v_state_id2, CASE WHEN v_status2 = 'with_staff' THEN v_staff_id ELSE NULL END);
     END IF;
     IF v_has_pant THEN
-      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, qr_code, current_status, asset_state_id, current_staff_id)
-      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'pant', v_sub_pant, v_pos_code, 2, gen_random_uuid()::text,
+      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, barcode, current_status, asset_state_id, current_staff_id)
+      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'pant', v_sub_pant, v_pos_code, 2, LPAD(NEXTVAL('uniform_barcode_seq')::TEXT, 6, '0'),
         v_status2, v_state_id2, CASE WHEN v_status2 = 'with_staff' THEN v_staff_id ELSE NULL END);
     END IF;
     IF v_has_apron THEN
-      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, qr_code, current_status, asset_state_id, current_staff_id)
-      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'apron', v_sub_apron, v_pos_code, 2, gen_random_uuid()::text,
+      INSERT INTO uniform_items (tenant_id, branch_id, category_id, item_type, item_subtype_id, position_code, set_number, barcode, current_status, asset_state_id, current_staff_id)
+      VALUES (v_tenant_id, v_branch_id, v_cat_id, 'apron', v_sub_apron, v_pos_code, 2, LPAD(NEXTVAL('uniform_barcode_seq')::TEXT, 6, '0'),
         v_status2, v_state_id2, CASE WHEN v_status2 = 'with_staff' THEN v_staff_id ELSE NULL END);
     END IF;
 

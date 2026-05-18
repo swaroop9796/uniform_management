@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowRight, Pencil, Check, X as XIcon } from 'lucide-react'
+import { ChevronLeft, ArrowRight, Pencil, Check, X as XIcon, Download } from 'lucide-react'
+import JsBarcode from 'jsbarcode'
 import { supabase } from '@/lib/supabase'
+import { itemService } from '@/services/itemService'
+import { staffService } from '@/services/staffService'
 import { useAuth } from '@/hooks/useAuth'
 import { useBranch } from '@/contexts/BranchContext'
 import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
@@ -39,14 +42,12 @@ export function ItemDetailPage() {
 
   async function loadData(itemId: string) {
     const [itemRes, histRes, staffRes] = await Promise.all([
-      supabase.from('uniform_items')
-        .select('*, category:category_id(*), current_staff:current_staff_id(*)')
-        .eq('id', itemId).single(),
+      itemService.get(itemId),
       supabase.from('uniform_transitions')
         .select('*, staff:staff_id(name), performer:performed_by(full_name)')
         .eq('uniform_item_id', itemId)
         .order('created_at', { ascending: false }),
-      supabase.from('staff_members').select('*').eq('is_active', true).eq('branch_id', selectedBranchId).order('name'),
+      staffService.listActive(selectedBranchId),
     ])
     setItem(itemRes.data as UniformItem)
     setHistory(histRes.data ?? [])
@@ -67,6 +68,7 @@ export function ItemDetailPage() {
       const { data: existing } = await supabase
         .from('uniform_items')
         .select('id')
+        .is('deleted_at', null)
         .eq('current_staff_id', selectedStaff)
         .eq('item_type', item.item_type)
         .neq('id', item.id)
@@ -94,10 +96,47 @@ export function ItemDetailPage() {
   async function saveSize() {
     if (!item) return
     setSavingSize(true)
-    await supabase.from('uniform_items').update({ size: sizeValue || null }).eq('id', item.id)
+    await itemService.update(item.id, { size: sizeValue || null })
     setSavingSize(false)
     setEditingSize(false)
     setItem(prev => prev ? { ...prev, size: sizeValue || null } : prev)
+  }
+
+  function downloadBarcode() {
+    if (!item) return
+    const barWidth = 2
+    const barcodeCanvas = document.createElement('canvas')
+    JsBarcode(barcodeCanvas, item.barcode, {
+      format: 'CODE128', width: barWidth, height: 80,
+      displayValue: false, margin: barWidth * 10,
+      background: '#ffffff', lineColor: '#000000',
+    })
+    const scale = 3
+    const bW = barcodeCanvas.width * scale
+    const bH = barcodeCanvas.height * scale
+    const canvas = document.createElement('canvas')
+    canvas.width = bW
+    canvas.height = bH + 80
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(barcodeCanvas, 0, 0, bW, bH)
+    ctx.imageSmoothingEnabled = true
+    ctx.fillStyle = '#0f172a'
+    ctx.font = 'bold 28px -apple-system, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(`${item.position_code} · ${ITEM_TYPE_LABELS[item.item_type].toUpperCase()}`, bW / 2, bH + 28)
+    ctx.font = '22px -apple-system, system-ui, sans-serif'
+    ctx.fillStyle = '#64748b'
+    ctx.fillText(`Set ${item.set_number} · ${item.category?.name ?? ''}`, bW / 2, bH + 52)
+    ctx.font = 'bold 20px monospace'
+    ctx.fillStyle = '#94a3b8'
+    ctx.fillText(item.barcode, bW / 2, bH + 74)
+    const link = document.createElement('a')
+    link.download = `${item.position_code}-${item.item_type}-set${item.set_number}.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
   }
 
   const canEdit = profile?.role && ['owner', 'store_manager'].includes(profile.role)
@@ -168,8 +207,16 @@ export function ItemDetailPage() {
         )}
 
         <div className="mt-4 pt-4 border-t border-slate-50">
-          <p className="text-xs text-slate-400 mb-0.5">QR Code</p>
-          <p className="text-xs font-mono text-slate-600 break-all">{item.qr_code}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-400">Barcode</p>
+            <button
+              onClick={downloadBarcode}
+              className="flex items-center gap-1.5 text-xs text-slate-500 px-2.5 py-1.5 rounded-lg border border-slate-200 active:bg-slate-50"
+            >
+              <Download size={13} /> Download PNG
+            </button>
+          </div>
+          <p className="text-2xl font-bold font-mono text-slate-800 tracking-widest mt-1">{item.barcode}</p>
         </div>
 
         <div className="mt-4 flex gap-2">

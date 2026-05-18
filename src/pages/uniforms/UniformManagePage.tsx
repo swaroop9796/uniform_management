@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import QRCode from 'qrcode'
-import { Plus, Download, Printer, ChevronDown, ChevronUp, X, QrCode } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import JsBarcode from 'jsbarcode'
+import { Plus, Download, Printer, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { itemService } from '@/services/itemService'
+import { generateBarcode } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -33,7 +34,7 @@ export function UniformManagePage() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
-  const [qrPreview, setQrPreview] = useState<{ item: UniformItem; dataUrl: string } | null>(null)
+  const [barcodePreview, setBarcodePreview] = useState<{ item: UniformItem; dataUrl: string } | null>(null)
 
   const canEdit = profile?.role && ['owner', 'hr_admin', 'branch_manager'].includes(profile.role)
 
@@ -42,9 +43,7 @@ export function UniformManagePage() {
   }, [uniformCategories])
 
   async function loadData() {
-    const { data } = await supabase.from('uniform_items')
-      .select('*, category:category_id(*), current_staff:current_staff_id(name)')
-      .order('position_code').order('set_number').order('item_type')
+    const { data } = await itemService.listAll()
     const items = (data ?? []) as UniformItem[]
     const grouped: GroupedItems[] = uniformCategories.map(cat => ({
       category: cat,
@@ -59,113 +58,94 @@ export function UniformManagePage() {
     setCollapsed(c => ({ ...c, [catId]: !c[catId] }))
   }
 
-  async function openQrPreview(item: UniformItem) {
-    const dataUrl = await generateQrDataUrl(item)
-    setQrPreview({ item, dataUrl })
-  }
-
-  async function generateQrDataUrl(item: UniformItem): Promise<string> {
-    return QRCode.toDataURL(item.qr_code, {
-      width: 240,
-      margin: 2,
-      color: { dark: '#0f172a', light: '#ffffff' },
-    })
-  }
-
-  async function downloadQR(item: UniformItem) {
+  function makeBarcodeDataUrl(value: string): string {
     const canvas = document.createElement('canvas')
-    const size = 320
-    canvas.width = size
-    canvas.height = size + 80
-    const ctx = canvas.getContext('2d')!
+    JsBarcode(canvas, value, {
+      format: 'CODE128', width: 3, height: 80,
+      displayValue: false, margin: 10,
+      background: '#ffffff', lineColor: '#0f172a',
+    })
+    return canvas.toDataURL('image/png')
+  }
 
-    // White background
+  function openBarcodePreview(item: UniformItem) {
+    setBarcodePreview({ item, dataUrl: makeBarcodeDataUrl(item.barcode) })
+  }
+
+  function downloadBarcode(item: UniformItem) {
+    const barcodeCanvas = document.createElement('canvas')
+    JsBarcode(barcodeCanvas, item.barcode, {
+      format: 'CODE128', width: 3, height: 80,
+      displayValue: false, margin: 10,
+      background: '#ffffff', lineColor: '#0f172a',
+    })
+    const W = barcodeCanvas.width
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = barcodeCanvas.height + 70
+    const ctx = canvas.getContext('2d')!
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-    // QR code
-    const qrCanvas = document.createElement('canvas')
-    await QRCode.toCanvas(qrCanvas, item.qr_code, {
-      width: size - 20,
-      margin: 2,
-      color: { dark: '#0f172a', light: '#ffffff' },
-    })
-    ctx.drawImage(qrCanvas, 10, 10)
-
-    // Label: position_code + item_type
+    ctx.drawImage(barcodeCanvas, 0, 0)
+    const y = barcodeCanvas.height
     ctx.fillStyle = '#0f172a'
-    ctx.font = 'bold 22px -apple-system, system-ui, sans-serif'
+    ctx.font = 'bold 18px -apple-system, system-ui, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(`${item.position_code} · ${ITEM_TYPE_LABELS[item.item_type].toUpperCase()}`, size / 2, size + 30)
-
-    // Set number
-    ctx.font = '15px -apple-system, system-ui, sans-serif'
+    ctx.fillText(`${item.position_code} · ${ITEM_TYPE_LABELS[item.item_type].toUpperCase()}`, W / 2, y + 22)
+    ctx.font = '14px -apple-system, system-ui, sans-serif'
     ctx.fillStyle = '#64748b'
-    ctx.fillText(`Set ${item.set_number} · ${item.category?.name ?? ''}`, size / 2, size + 52)
-
-    // Short QR ID for reference
-    ctx.font = '10px monospace'
+    ctx.fillText(`Set ${item.set_number} · ${item.category?.name ?? ''}`, W / 2, y + 42)
+    ctx.font = 'bold 13px monospace'
     ctx.fillStyle = '#94a3b8'
-    ctx.fillText(item.qr_code.substring(0, 20) + '…', size / 2, size + 74)
-
+    ctx.fillText(item.barcode, W / 2, y + 62)
     const link = document.createElement('a')
     link.download = `${item.position_code}-${item.item_type}-set${item.set_number}.png`
     link.href = canvas.toDataURL('image/png')
     link.click()
   }
 
-  async function printCategoryQRs(group: GroupedItems) {
+  function printCategoryBarcodes(group: GroupedItems) {
     const win = window.open('', '_blank')
     if (!win) return
-
-    // Generate all QR data URLs
-    const qrUrls = await Promise.all(group.items.map(item =>
-      QRCode.toDataURL(item.qr_code, { width: 180, margin: 1, color: { dark: '#0f172a', light: '#ffffff' } })
-    ))
-
+    const barcodeUrls = group.items.map(item => makeBarcodeDataUrl(item.barcode))
     const cards = group.items.map((item, idx) => `
       <div class="card">
-        <img src="${qrUrls[idx]}" width="160" height="160" />
+        <img src="${barcodeUrls[idx]}" style="width:100%;height:60px;object-fit:contain" />
         <div class="label">${item.position_code} · ${ITEM_TYPE_LABELS[item.item_type].toUpperCase()}</div>
         <div class="sub">Set ${item.set_number}</div>
-        <div class="code">${item.qr_code.substring(0, 16)}…</div>
-      </div>
-    `).join('')
-
-    win.document.write(`
-      <!DOCTYPE html><html><head>
-      <title>QR Labels — ${group.category.name}</title>
+        <div class="code">${item.barcode}</div>
+      </div>`).join('')
+    win.document.write(`<!DOCTYPE html><html><head>
+      <title>Barcode Labels — ${group.category.name}</title>
       <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, sans-serif; background: #fff; padding: 16px; }
-        h1 { font-size: 16px; color: #0f172a; margin-bottom: 16px; }
-        .grid { display: flex; flex-wrap: wrap; gap: 12px; }
-        .card { width: 180px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; text-align: center; page-break-inside: avoid; }
-        .label { font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 6px; }
-        .sub { font-size: 11px; color: #64748b; margin-top: 2px; }
-        .code { font-size: 8px; font-family: monospace; color: #94a3b8; margin-top: 4px; }
-        @media print { body { padding: 0; } h1 { display: none; } }
-      </style></head>
-      <body>
-        <h1>${group.category.name} — ${group.items.length} QR Labels</h1>
-        <div class="grid">${cards}</div>
-        <script>window.onload = () => window.print()</script>
-      </body></html>
-    `)
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,sans-serif;background:#fff;padding:16px}
+        h1{font-size:15px;color:#0f172a;margin-bottom:12px}
+        .grid{display:flex;flex-wrap:wrap;gap:10px}
+        .card{width:200px;border:1px solid #e2e8f0;border-radius:10px;padding:10px;text-align:center;page-break-inside:avoid}
+        .label{font-size:13px;font-weight:700;color:#0f172a;margin-top:6px}
+        .sub{font-size:11px;color:#64748b;margin-top:2px}
+        .code{font-size:12px;font-family:monospace;color:#0f172a;margin-top:4px;font-weight:bold}
+        @media print{body{padding:0}h1{display:none}}
+      </style></head><body>
+      <h1>${group.category.name} — ${group.items.length} labels</h1>
+      <div class="grid">${cards}</div>
+      <script>window.onload=()=>window.print()</script>
+    </body></html>`)
     win.document.close()
   }
 
   async function addItem() {
     if (!form.position_code.trim() || !form.category_id) { setFormError('Position code and category are required'); return }
     setSaving(true); setFormError('')
-    const { error } = await supabase.from('uniform_items').insert({
+    const { error } = await itemService.insert({
       tenant_id: profile!.tenant_id,
       branch_id: profile!.branch_id!,
       category_id: form.category_id,
       item_type: form.item_type,
       position_code: form.position_code.trim().toUpperCase(),
       set_number: parseInt(form.set_number),
-      qr_code: crypto.randomUUID(),
+      barcode: generateBarcode(),
       current_status: 'in_store',
       size: form.size || null,
     })
@@ -180,8 +160,8 @@ export function UniformManagePage() {
     e.stopPropagation()
     const staffName = (item.current_staff as { name?: string })?.name
     const assignedMsg = staffName ? ` Currently assigned to ${staffName}.` : ''
-    if (!confirm(`Delete ${item.position_code} ${item.item_type} Set ${item.set_number}?${assignedMsg} All history will be lost.`)) return
-    await supabase.from('uniform_items').delete().eq('id', item.id)
+    if (!confirm(`Delete ${item.position_code} ${item.item_type} Set ${item.set_number}?${assignedMsg} History is preserved.`)) return
+    await itemService.softDelete(item.id)
     loadData()
   }
 
@@ -211,7 +191,7 @@ export function UniformManagePage() {
               {collapsed[group.category.id] ? <ChevronDown size={14} className="text-slate-400 ml-auto" /> : <ChevronUp size={14} className="text-slate-400 ml-auto" />}
             </button>
             <button
-              onClick={() => printCategoryQRs(group)}
+              onClick={() => printCategoryBarcodes(group)}
               className="ml-3 flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 transition-colors flex-shrink-0"
             >
               <Printer size={13} /> Print QRs
@@ -233,22 +213,15 @@ export function UniformManagePage() {
                       <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">{item.size}</span>
                     )}
                   </p>
-                  <p className="text-xs font-mono text-slate-300 mt-0.5 truncate">{item.qr_code.substring(0, 24)}…</p>
+                  <p className="text-xs font-mono text-slate-400 mt-0.5">{item.barcode}</p>
                 </div>
                 <StatusBadge status={item.current_status} size="sm" />
               </button>
               <div className="flex gap-1 flex-shrink-0">
                 <button
-                  onClick={() => openQrPreview(item)}
+                  onClick={() => openBarcodePreview(item)}
                   className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
-                  title="View QR"
-                >
-                  <QrCode size={15} />
-                </button>
-                <button
-                  onClick={() => downloadQR(item)}
-                  className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
-                  title="Download QR"
+                  title="View Barcode"
                 >
                   <Download size={15} />
                 </button>
@@ -267,26 +240,26 @@ export function UniformManagePage() {
         </div>
       ))}
 
-      {/* QR Preview modal */}
-      {qrPreview && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4" onClick={() => setQrPreview(null)}>
+      {/* Barcode Preview modal */}
+      {barcodePreview && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4" onClick={() => setBarcodePreview(null)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-xs text-center space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">QR Label</h3>
-              <button onClick={() => setQrPreview(null)}><X size={18} className="text-slate-400" /></button>
+              <h3 className="text-base font-bold text-slate-900">Barcode Label</h3>
+              <button onClick={() => setBarcodePreview(null)}><X size={18} className="text-slate-400" /></button>
             </div>
-            <div className="bg-slate-50 rounded-2xl p-4 inline-block mx-auto">
-              <img src={qrPreview.dataUrl} alt="QR code" className="w-48 h-48" />
+            <div className="bg-slate-50 rounded-2xl p-4">
+              <img src={barcodePreview.dataUrl} alt="Barcode" className="w-full h-16 object-contain" />
             </div>
             <div>
               <p className="text-lg font-bold text-slate-900">
-                {qrPreview.item.position_code} · {ITEM_TYPE_LABELS[qrPreview.item.item_type].toUpperCase()}
+                {barcodePreview.item.position_code} · {ITEM_TYPE_LABELS[barcodePreview.item.item_type].toUpperCase()}
               </p>
-              <p className="text-sm text-slate-500 mt-0.5">Set {qrPreview.item.set_number} · {qrPreview.item.category?.name}</p>
-              <p className="text-xs font-mono text-slate-300 mt-2 break-all">{qrPreview.item.qr_code}</p>
+              <p className="text-sm text-slate-500 mt-0.5">Set {barcodePreview.item.set_number} · {barcodePreview.item.category?.name}</p>
+              <p className="text-2xl font-bold font-mono text-slate-700 mt-2 tracking-widest">{barcodePreview.item.barcode}</p>
             </div>
             <button
-              onClick={() => downloadQR(qrPreview.item)}
+              onClick={() => downloadBarcode(barcodePreview.item)}
               className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 text-white rounded-xl text-sm font-semibold active:bg-slate-800"
             >
               <Download size={16} /> Download PNG

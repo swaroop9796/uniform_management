@@ -44,7 +44,7 @@ describe('transition_uniform RPC', () => {
       item_subtype_id: ctx.itemSubtypeId,
       position_code: `RPC${uid()}`,
       set_number: 1,
-      qr_code: `rpc-test-${uid()}`,
+      barcode: `10${uid()}`.slice(0, 6),
       current_status: 'in_store',
       asset_state_id: ctx.assetStateInStoreId,
     }).select('id').single()

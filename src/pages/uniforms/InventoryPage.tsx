@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Filter } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { itemService } from '@/services/itemService'
 import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
 import { StatusBadge } from '@/components/StatusBadge'
 import type { UniformItem, UniformStatus } from '@/types'
@@ -20,10 +20,7 @@ export function InventoryPage() {
   }, [uniformCategories])
 
   async function loadData() {
-    const { data } = await supabase.from('uniform_items')
-      .select('*, category:category_id(*), current_staff:current_staff_id(name)')
-      .order('position_code')
-      .order('set_number')
+    const { data } = await itemService.listAll()
     setItems(data as UniformItem[] ?? [])
     setLoading(false)
   }

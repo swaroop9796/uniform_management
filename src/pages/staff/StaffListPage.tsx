@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ChevronRight, Shirt, Plus, Pencil, Trash2, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { itemService } from '@/services/itemService'
+import { staffService } from '@/services/staffService'
 import { useAuth } from '@/hooks/useAuth'
 import { useBranch } from '@/contexts/BranchContext'
 import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
@@ -72,11 +74,11 @@ export function StaffListPage() {
 
   async function loadStaff() {
     const [staffRes, itemsRes] = await Promise.all([
-      supabase.from('staff_members').select('*').eq('is_active', true).eq('branch_id', selectedBranchId).order('name', { ascending: true }),
-      supabase.from('uniform_items').select('current_staff_id').eq('branch_id', selectedBranchId).not('current_staff_id', 'is', null),
+      staffService.listActive(selectedBranchId),
+      itemService.countAssigned(selectedBranchId),
     ])
-    const items = itemsRes.data ?? []
-    const list: StaffWithCount[] = (staffRes.data ?? []).map(s => ({
+    const items = (itemsRes.data ?? []) as { current_staff_id: string | null }[]
+    const list: StaffWithCount[] = ((staffRes.data ?? []) as StaffMember[]).map(s => ({
       ...s,
       uniform_count: items.filter(i => i.current_staff_id === s.id).length,
     }))
@@ -100,13 +102,13 @@ export function StaffListPage() {
     if (!form.name.trim()) { setFormError('Name is required'); return }
     setSaving(true); setFormError('')
     if (editing) {
-      const { error } = await supabase.from('staff_members').update({
+      const { error } = await staffService.update(editing.id, {
         name: form.name,
         role_category: form.role_category,
-      }).eq('id', editing.id)
+      })
       if (error) { setFormError(friendlyError(error)); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('staff_members').insert({
+      const { error } = await staffService.insert({
         name: form.name,
         role_category: form.role_category,
         tenant_id: profile!.tenant_id, branch_id: selectedBranchId,
@@ -119,12 +121,12 @@ export function StaffListPage() {
   async function deactivate(s: StaffMember, e: React.MouseEvent) {
     e.stopPropagation()
     const { count } = await supabase.from('uniform_items')
-      .select('id', { count: 'exact', head: true }).eq('current_staff_id', s.id)
+      .select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('current_staff_id', s.id)
     const assignedMsg = (count ?? 0) > 0
       ? `They currently have ${count} uniform(s) assigned — these will be unassigned. Transition history is kept.`
       : `Their uniform history will be kept.`
     if (!confirm(`Remove ${s.name}? ${assignedMsg}`)) return
-    await supabase.from('staff_members').update({ is_active: false }).eq('id', s.id)
+    await staffService.deactivate(s.id)
     if ((count ?? 0) > 0) {
       await supabase.from('uniform_items').update({ current_staff_id: null }).eq('current_staff_id', s.id)
     }

@@ -15,7 +15,7 @@ const makeItem = () => ({
   item_subtype_id: ctx.itemSubtypeId,
   position_code: `TEST${uid()}`,
   set_number: 1,
-  qr_code: `qr-test-${uid()}`,
+  barcode: `10${uid()}`.slice(0, 6),
   current_status: 'in_store' as const,
   asset_state_id: ctx.assetStateInStoreId,
 })
@@ -86,5 +86,33 @@ describe('uniform_items', () => {
     expect(error).toBeNull()
     const { data: gone } = await db.from('uniform_items').select('id').eq('id', item!.id)
     expect(gone!.length).toBe(0)
+  })
+})
+
+describe('soft delete', () => {
+  let softDeletedId: string
+
+  afterAll(async () => {
+    if (softDeletedId) await db.from('uniform_items').delete().eq('id', softDeletedId)
+  })
+
+  it('sets deleted_at on soft delete', async () => {
+    const { data: item } = await db.from('uniform_items').insert(makeItem()).select().single()
+    softDeletedId = item!.id
+    const { error } = await db.from('uniform_items')
+      .update({ deleted_at: new Date().toISOString() }).eq('id', item!.id)
+    expect(error).toBeNull()
+  })
+
+  it('is excluded from deleted_at IS NULL filter', async () => {
+    const { data } = await db.from('uniform_items')
+      .select('id').is('deleted_at', null).eq('id', softDeletedId)
+    expect(data!.length).toBe(0)
+  })
+
+  it('is still present in raw query without filter', async () => {
+    const { data } = await db.from('uniform_items')
+      .select('id, deleted_at').eq('id', softDeletedId).single()
+    expect(data!.deleted_at).not.toBeNull()
   })
 })

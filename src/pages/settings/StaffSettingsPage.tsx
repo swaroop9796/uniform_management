@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { staffService } from '@/services/staffService'
 import { useAuth } from '@/hooks/useAuth'
 import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
 import type { StaffMember, RoleCategory } from '@/types'
@@ -35,7 +36,7 @@ export function StaffSettingsPage() {
 
   async function loadStaff() {
     const { data } = await supabase.from('staff_members').select('*').order('name', { ascending: true })
-    setStaff(data ?? [])
+    setStaff((data ?? []) as StaffMember[])
     setLoading(false)
   }
 
@@ -50,12 +51,12 @@ export function StaffSettingsPage() {
     if (!form.name.trim()) { setError('Name is required'); return }
     setSaving(true); setError('')
     if (editing) {
-      const { error: err } = await supabase.from('staff_members').update({
+      const { error: err } = await staffService.update(editing.id, {
         name: form.name, role_category: form.role_category,
-      }).eq('id', editing.id)
+      })
       if (err) { setError(err.message); setSaving(false); return }
     } else {
-      const { error: err } = await supabase.from('staff_members').insert({
+      const { error: err } = await staffService.insert({
         name: form.name, role_category: form.role_category,
         tenant_id: profile!.tenant_id, branch_id: profile!.branch_id!,
       })
@@ -66,7 +67,7 @@ export function StaffSettingsPage() {
 
   async function remove(s: StaffMember) {
     if (!confirm(`Remove ${s.name}? This cannot be undone.`)) return
-    await supabase.from('staff_members').update({ is_active: false }).eq('id', s.id)
+    await staffService.deactivate(s.id)
     loadStaff()
   }
 

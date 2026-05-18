@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, User, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { itemService } from '@/services/itemService'
+import { staffService } from '@/services/staffService'
 import { StatusBadge } from '@/components/StatusBadge'
 import type { StaffMember, UniformItem, UniformTransition } from '@/types'
 import { ROLE_CATEGORY_LABELS, ITEM_TYPE_LABELS } from '@/types'
@@ -19,23 +21,19 @@ export function StaffDetailPage() {
   async function loadData(staffId: string) {
     // Step 1: staff profile + items currently assigned + items linked via any transition
     const [staffRes, assignedRes, linkedTransRes] = await Promise.all([
-      supabase.from('staff_members').select('*').eq('id', staffId).single(),
-      supabase.from('uniform_items')
-        .select('*, category:category_id(*)')
-        .eq('current_staff_id', staffId)
-        .order('position_code'),
+      staffService.get(staffId),
+      itemService.forStaff(staffId),
       supabase.from('uniform_transitions')
         .select('uniform_item_id')
         .eq('staff_id', staffId),
     ])
 
     // Step 2: fetch items found via transitions (may overlap with assigned)
-    const linkedIds = [...new Set((linkedTransRes.data ?? []).map((t: { uniform_item_id: string }) => t.uniform_item_id))]
+    const linkedIds: string[] = [...new Set(
+      ((linkedTransRes.data ?? []) as { uniform_item_id: string }[]).map(t => t.uniform_item_id)
+    )]
     const linkedRes = linkedIds.length > 0
-      ? await supabase.from('uniform_items')
-          .select('*, category:category_id(*)')
-          .in('id', linkedIds)
-          .order('position_code')
+      ? await itemService.linkedViaTransitions(linkedIds)
       : { data: [] }
 
     // Merge + deduplicate items

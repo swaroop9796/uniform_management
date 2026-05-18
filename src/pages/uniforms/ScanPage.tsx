@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Html5Qrcode } from 'html5-qrcode'
+import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser'
+import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 import { X, Search, Camera, CameraOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { itemService } from '@/services/itemService'
+import { staffService } from '@/services/staffService'
 import { useAuth } from '@/hooks/useAuth'
 import { useBranch } from '@/contexts/BranchContext'
 import { useCompanyConfig } from '@/contexts/CompanyConfigContext'
@@ -14,7 +16,6 @@ import type { UniformItem, StaffMember, UniformStatus } from '@/types'
 import { STATUS_LABELS, ITEM_TYPE_LABELS } from '@/types'
 
 const TRANSITION_STATES: UniformStatus[] = ['with_staff', 'in_laundry', 'in_store', 'damaged', 'lost']
-const SCANNER_ID = 'qr-scanner-viewport'
 
 export function ScanPage() {
   const { profile } = useAuth()
@@ -22,7 +23,8 @@ export function ScanPage() {
   const { numSets } = useCompanyConfig()
   const navigate = useNavigate()
   const { transition, loading: transitioning } = useUniformTransition()
-  const scannerRef = useRef<Html5Qrcode | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const controlsRef = useRef<IScannerControls | null>(null)
   const [scanning, setScanning] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [item, setItem] = useState<UniformItem | null>(null)
@@ -34,13 +36,12 @@ export function ScanPage() {
   const [transitionError, setTransitionError] = useState('')
   const [success, setSuccess] = useState(false)
   const [manualCode, setManualCode] = useState('')
-  const [searchResults, setSearchResults] = useState<{ qr_code: string; position_code: string; item_type: string; set_number: string; current_status: string; category: { name: string } | null }[]>([])
+  const [searchResults, setSearchResults] = useState<{ barcode: string; position_code: string; item_type: string; set_number: string; current_status: string; category: { name: string } | null }[]>([])
   const [searching, setSearching] = useState(false)
 
   useEffect(() => {
     if (selectedBranchId && selectedBranchId !== 'all') {
-      supabase.from('staff_members').select('*').eq('is_active', true).eq('branch_id', selectedBranchId).order('name')
-        .then(({ data }) => setAllStaff(data ?? []))
+      staffService.listActive(selectedBranchId).then(({ data }) => setAllStaff(data ?? []))
     }
     return () => { stopScanner() }
   }, [selectedBranchId])
@@ -49,46 +50,44 @@ export function ScanPage() {
     setCameraError('')
     setLookupError('')
     try {
-      const cameras = await Html5Qrcode.getCameras()
-      if (!cameras.length) { setCameraError('No camera found on this device.'); return }
-      const cameraId = cameras.find(c => /back|rear|environment/i.test(c.label))?.id ?? cameras[cameras.length - 1].id
-      // Show the div before starting — iOS won't render video that starts inside display:none
-      flushSync(() => setScanning(true))
-      const scanner = new Html5Qrcode(SCANNER_ID)
-      scannerRef.current = scanner
-      await scanner.start(
-        cameraId,
-        { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1 },
-        handleScan,
-        () => {}
-      )
+      const hints = new Map()
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128])
+      hints.set(DecodeHintType.TRY_HARDER, true)
+
+      const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 80 })
+      const devices = await BrowserMultiFormatReader.listVideoInputDevices()
+      if (!devices.length) { setCameraError('No camera found on this device.'); return }
+      const deviceId = devices.find(d => /back|rear|environment/i.test(d.label))?.deviceId
+        ?? devices[devices.length - 1].deviceId
+
+      setScanning(true)
+
+      const controls = await reader.decodeFromVideoDevice(deviceId, videoRef.current!, (result) => {
+        if (result) {
+          controls.stop()
+          controlsRef.current = null
+          setScanning(false)
+          lookupItem(result.getText())
+        }
+      })
+      controlsRef.current = controls
     } catch {
       setScanning(false)
       setCameraError('Camera permission denied. Allow camera access in your browser settings, then try again.')
     }
   }
 
-  async function stopScanner() {
-    if (scannerRef.current?.isScanning) {
-      await scannerRef.current.stop().catch(() => {})
-    }
+  function stopScanner() {
+    controlsRef.current?.stop()
+    controlsRef.current = null
     setScanning(false)
   }
 
-  async function handleScan(qrCode: string) {
-    await stopScanner()
-    await lookupItem(qrCode)
-  }
-
-  async function lookupItem(qrCode: string) {
+  async function lookupItem(barcode: string) {
     setLookupError('')
-    const { data } = await supabase
-      .from('uniform_items')
-      .select('*, category:category_id(*), current_staff:current_staff_id(*)')
-      .eq('qr_code', qrCode.trim())
-      .single()
+    const { data } = await itemService.byBarcode(barcode)
     if (!data) {
-      setLookupError('QR code not recognised. Make sure you scanned a uniform label from this system.')
+      setLookupError('Barcode not recognised. Make sure you scanned a uniform label from this system.')
       return
     }
     setItem(data as UniformItem)
@@ -104,6 +103,7 @@ export function ScanPage() {
       const { data: existing } = await supabase
         .from('uniform_items')
         .select('id')
+        .is('deleted_at', null)
         .eq('current_staff_id', selectedStaff)
         .eq('item_type', item.item_type)
         .neq('id', item.id)
@@ -130,14 +130,9 @@ export function ScanPage() {
   async function handleManualInput(value: string) {
     setManualCode(value)
     setSearchResults([])
-    if (value.trim().length < 4) return
+    if (value.trim().length < 3) return
     setSearching(true)
-    const { data } = await supabase
-      .from('uniform_items')
-      .select('qr_code, position_code, item_type, set_number, current_status, category:category_id(name)')
-      .eq('branch_id', selectedBranchId)
-      .ilike('qr_code', `%${value.trim()}%`)
-      .limit(8)
+    const { data } = await itemService.search(selectedBranchId, value)
     setSearching(false)
     setSearchResults((data ?? []) as unknown as typeof searchResults)
   }
@@ -151,15 +146,10 @@ export function ScanPage() {
     <div className="px-4 py-5 space-y-5">
       <h1 className="text-xl font-bold text-slate-900">Scan Uniform</h1>
 
-      {/* Camera viewport — always in DOM so Html5Qrcode can attach to it */}
+      {/* Camera viewport */}
       <div className={scanning ? 'block' : 'hidden'}>
-        <div className="relative rounded-2xl overflow-hidden bg-black" style={{ aspectRatio: '1' }}>
-          <div id={SCANNER_ID} className="w-full h-full" />
-          {/* Scan frame overlay */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-52 h-52 border-2 border-white rounded-2xl opacity-70" />
-          </div>
-          {/* Stop button */}
+        <div className="relative rounded-2xl overflow-hidden bg-black" style={{ aspectRatio: '4/3' }}>
+          <video ref={videoRef} className="w-full h-full object-cover" />
           <button
             onClick={stopScanner}
             className="absolute top-3 right-3 bg-black/50 text-white p-2 rounded-full"
@@ -168,11 +158,11 @@ export function ScanPage() {
           </button>
         </div>
         <p className="text-center text-sm text-slate-400 mt-2">
-          Point camera at a uniform QR label
+          Hold the barcode steady in view
         </p>
       </div>
 
-      {/* Start scan button — shown when not scanning and no item loaded */}
+      {/* Start scan button */}
       {!scanning && !item && !success && (
         <div className="space-y-4">
           <button
@@ -189,10 +179,9 @@ export function ScanPage() {
             </div>
           )}
 
-          {/* Manual search by partial QR code */}
           <div className="bg-white rounded-2xl border border-slate-100 p-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-              Or search by QR code
+              Or search by barcode
             </p>
             <div className="relative">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-slate-900">
@@ -200,7 +189,8 @@ export function ScanPage() {
                 <input
                   value={manualCode}
                   onChange={e => handleManualInput(e.target.value)}
-                  placeholder="First or last 4 chars of code…"
+                  placeholder="Type barcode number…"
+                  inputMode="numeric"
                   className="flex-1 text-sm focus:outline-none bg-transparent"
                 />
                 {searching && <div className="w-4 h-4 border-2 border-slate-200 border-t-slate-600 rounded-full animate-spin flex-shrink-0" />}
@@ -209,20 +199,20 @@ export function ScanPage() {
                 <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-20">
                   {searchResults.map(r => (
                     <button
-                      key={r.qr_code}
-                      onClick={() => { setManualCode(''); setSearchResults([]); lookupItem(r.qr_code) }}
+                      key={r.barcode}
+                      onClick={() => { setManualCode(''); setSearchResults([]); lookupItem(r.barcode) }}
                       className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 border-b border-slate-50 last:border-0"
                     >
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{r.position_code}</p>
                         <p className="text-xs text-slate-400 capitalize">{r.item_type} · Set {r.set_number} · {r.category?.name}</p>
                       </div>
-                      <span className="text-xs text-slate-400 font-mono ml-3 flex-shrink-0">{r.qr_code.slice(0, 4)}…{r.qr_code.slice(-4)}</span>
+                      <span className="text-xs text-slate-400 font-mono ml-3 flex-shrink-0">{r.barcode}</span>
                     </button>
                   ))}
                 </div>
               )}
-              {manualCode.length >= 4 && !searching && searchResults.length === 0 && (
+              {manualCode.length >= 3 && !searching && searchResults.length === 0 && (
                 <p className="text-xs text-slate-400 mt-2 px-1">No items matched — try a different part of the code</p>
               )}
             </div>
@@ -249,7 +239,6 @@ export function ScanPage() {
 
       {item && !success && (
         <div className="space-y-4">
-          {/* Item summary card */}
           <div className="bg-white rounded-2xl border border-slate-100 p-5">
             <div className="flex items-start justify-between mb-2">
               <div>
@@ -267,7 +256,6 @@ export function ScanPage() {
             )}
           </div>
 
-          {/* New state picker */}
           <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-4">
             <p className="text-sm font-semibold text-slate-700">Move to</p>
             <div className="grid grid-cols-2 gap-2">
